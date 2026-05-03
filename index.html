@@ -93,7 +93,7 @@
 
         .instruction-image {
             width: auto;
-            max-width: 100%;
+            max-width: 80%; /* 이미지 크기를 80%로 축소 */
             display: block;
             margin: 10px auto;
             border-radius: 8px;
@@ -539,7 +539,7 @@
                 ctx.fillStyle = '#ef4444';
                 ctx.font = 'bold 12px Pretendard';
                 ctx.textAlign = 'center';
-                ctx.fillText(`평균: ${avg.toFixed(2)}`, xPos, top - 8);
+                ctx.fillText(`평균: ${avg.toFixed(2)}`, xPos, top - 10); // 여백 조절
                 ctx.restore();
             }
         };
@@ -559,6 +559,11 @@
             },
             options: {
                 responsive: true,
+                layout: {
+                    padding: {
+                        top: 25 // 텍스트 짤림 방지를 위한 상단 여백 추가
+                    }
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
