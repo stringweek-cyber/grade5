@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내신 5등급 점수 자동 계산기</title>
+    <!-- SheetJS & Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #64748b;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text-main: #0f172a;
+            --text-sub: #475569;
+            --safe-green: #10b981;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: fit-content; /* 글자 길이에 맞춰 너비 조정 */
+            min-width: 600px;
+            max-width: 95%; 
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 5px;
+            letter-spacing: -0.025em;
+        }
+
+        /* Instruction Area */
+        .instruction-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: fit-content; /* 내부 글 길이에 맞춤 */
+        }
+
+        .instruction-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .instruction-content h4 {
+            margin: 0 0 8px 0;
+            color: var(--primary-dark);
+            font-size: 1rem;
+        }
+
+        .instruction-content p {
+            margin: 0 0 6px 0;
+            font-size: 0.95rem;
+            color: var(--text-sub);
+            line-height: 1.6;
+            white-space: nowrap; /* 문구가 한 줄에 오도록 유지 */
+        }
+
+        .path-highlight {
+            font-weight: 700;
+            color: #1e293b;
+            background: #dbeafe;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .instruction-image {
+            width: auto;
+            max-width: 100%;
+            display: block;
+            margin: 10px auto;
+            border-radius: 8px;
+            border: 1px solid #bfdbfe;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .privacy-note {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 5px;
+            font-size: 0.85rem;
+            color: var(--safe-green);
+            font-weight: 600;
+            background: #f0fdf4;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #dcfce7;
+            width: fit-content;
+        }
+
+        /* Drop Zone Styles */
+        #drop-zone {
+            background: var(--card);
+            border: 2px dashed var(--border);
+            border-radius: 20px;
+            padding: 60px 40px;
+            text-align: center;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+        }
+
+        #drop-zone:hover, #drop-zone.dragover {
+            border-color: var(--primary);
+            background-color: #eff6ff;
+        }
+
+        .upload-icon {
+            width: 64px;
+            height: 64px;
+            background: #dbeafe;
+            color: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+
+        #drop-zone h3 {
+            font-size: 1.25rem;
+            margin-bottom: 8px;
+        }
+
+        #drop-zone p {
+            color: var(--text-sub);
+            font-size: 0.95rem;
+        }
+
+        /* Result Section Styles */
+        #result-section {
+            display: none;
+            margin-top: 40px;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            background: var(--card);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid var(--border);
+        }
+
+        .summary-card span {
+            display: block;
+            color: var(--text-sub);
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .summary-card strong {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .chart-box {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .table-container {
+            background: var(--card);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background: #f1f5f9;
+            padding: 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 1rem;
+        }
+
+        .grade-pill {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .grade-1 { background: #dcfce7; color: #166534; }
+        .grade-2 { background: #dbeafe; color: #1e40af; }
+        .grade-3 { background: #fef9c3; color: #854d0e; }
+        .grade-4 { background: #ffedd5; color: #9a3412; }
+        .grade-5 { background: #fee2e2; color: #991b1b; }
+
+        .cutoff-val {
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #334155;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            display: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>내신 5등급 점수 자동 계산기</h1>
+    </header>
+
+    <div class="instruction-box">
+        <div class="instruction-header">
+            <div style="background: var(--primary); color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: bold; font-size: 0.8rem;">!</div>
+            <div class="instruction-content">
+                <h4>파일 업로드 안내</h4>
+                <p>나이스(NEIS) 메뉴: <span class="path-highlight">지필평가 통계 > 도수분포표</span> 에서 <span class="path-highlight">급간 '1 입력'</span> 후, <span class="path-highlight">저장 > XLS data</span> 다운로드 파일을 아래에 넣어주세요.</p>
+            </div>
+        </div>
+        
+        <img src="1.png" alt="나이스 엑셀 다운로드 안내 이미지" class="instruction-image" onerror="this.style.display='none'">
+
+        <div class="privacy-note">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            개인정보 보호: 업로드한 파일은 외부 서버에 전송되거나 저장되지 않으며, 오직 선생님의 PC 내에서만 안전하게 계산됩니다.
+        </div>
+    </div>
+
+    <div id="drop-zone">
+        <div class="upload-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        </div>
+        <h3>엑셀 파일을 여기로 드래그하세요</h3>
+        <p>또는 클릭하여 파일 선택</p>
+        <input type="file" id="file-input" hidden accept=".xlsx, .xls">
+    </div>
+
+    <div id="result-section">
+        <div class="summary-grid">
+            <div class="summary-card">
+                <span>대상 교과목</span>
+                <strong id="res-subject">-</strong>
+            </div>
+            <div class="summary-card">
+                <span>총 응시 인원</span>
+                <strong id="res-total">0명</strong>
+            </div>
+            <div class="summary-card">
+                <span>평균 점수(추정)</span>
+                <strong id="res-avg">0.0점</strong>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>등급</th>
+                        <th>비율</th>
+                        <th>누적 비율</th>
+                        <th>대상 인원</th>
+                        <th>등급 컷오프 (점수)</th>
+                    </tr>
+                </thead>
+                <tbody id="grade-body">
+                    <!-- 데이터 로드 시 삽입됨 -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="chart-box">
+            <h4 style="margin-top:0; color:var(--text-sub); font-size:0.9rem;">성적 분포 히스토그램</h4>
+            <canvas id="distributionChart" height="100"></canvas>
+        </div>
+        
+        <p style="margin-top:15px; color:var(--secondary); font-size:0.8rem;">
+            * 도수분포표 기반 계산으로, 실제 개별 점수 합계와 미세한 차이가 있을 수 있습니다.
+        </p>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const resultSection = document.getElementById('result-section');
+    const gradeBody = document.getElementById('grade-body');
+    let distributionChart = null;
+
+    const GRADE_CONFIG = [
+        { grade: 1, individualRatio: 10, ratio: 0.10, class: 'grade-1' },
+        { grade: 2, individualRatio: 24, ratio: 0.34, class: 'grade-2' },
+        { grade: 3, individualRatio: 32, ratio: 0.66, class: 'grade-3' },
+        { grade: 4, individualRatio: 24, ratio: 0.90, class: 'grade-4' },
+        { grade: 5, individualRatio: 10, ratio: 1.00, class: 'grade-5' }
+    ];
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) handleFile(e.target.files[0]);
+    });
+
+    function showToast(msg) {
+        const toast = document.getElementById('toast');
+        toast.innerText = msg;
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+
+    function handleFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                parseAndCalculate(jsonData);
+            } catch (err) {
+                showToast("파일을 읽는 중 오류가 발생했습니다.");
+                console.error(err);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function parseAndCalculate(rows) {
+        let subject = "확인 불가";
+        let distribution = [];
+        let totalSum = 0;
+        let weightedScoreSum = 0;
+
+        rows.forEach(row => {
+            const rowContent = row.join('|');
+            
+            if (rowContent.includes('교과목')) {
+                const match = rowContent.match(/교과목\s*:\s*([^|]+)/);
+                if (match) {
+                    subject = match[1].split('급간')[0].trim();
+                }
+            }
+
+            const scoreRegex = /(\d+(\.\d+)?)\s*(이상|~)/;
+            const scoreMatch = String(row[0]).match(scoreRegex);
+            
+            if (scoreMatch) {
+                let count = 0;
+                for (let i = row.length - 1; i >= 0; i--) {
+                    const cellVal = String(row[i]);
+                    if (cellVal.includes('명')) {
+                        count = parseInt(cellVal.replace(/[^0-9]/g, ''));
+                        break;
+                    }
+                    if (!isNaN(parseInt(cellVal)) && i > 5) {
+                         count = parseInt(cellVal);
+                         break;
+                    }
+                }
+
+                if (!isNaN(count) && count >= 0) {
+                    const score = parseFloat(scoreMatch[1]);
+                    distribution.push({ label: String(row[0]), score, count });
+                    totalSum += count;
+                    weightedScoreSum += (score * count);
+                }
+            }
+        });
+
+        if (totalSum === 0) {
+            showToast("데이터를 찾을 수 없습니다. 나이스 도수분포표 파일인지 확인해주세요.");
+            return;
+        }
+
+        renderResults(subject, totalSum, distribution, weightedScoreSum);
+    }
+
+    function renderResults(subject, total, dist, weightedSum) {
+        dist.sort((a, b) => b.score - a.score);
+
+        const averageScore = weightedSum / total;
+        document.getElementById('res-subject').innerText = subject;
+        document.getElementById('res-total').innerText = total.toLocaleString() + '명';
+        document.getElementById('res-avg').innerText = averageScore.toFixed(2) + '점';
+
+        gradeBody.innerHTML = '';
+        
+        let cumulativeCount = 0;
+        let distIdx = 0;
+
+        GRADE_CONFIG.forEach(cfg => {
+            const targetCount = Math.ceil(total * cfg.ratio);
+            let cutoffScore = 0;
+
+            while (distIdx < dist.length) {
+                const nextCount = cumulativeCount + dist[distIdx].count;
+                if (nextCount >= targetCount) {
+                    cutoffScore = dist[distIdx].score;
+                    break;
+                }
+                cumulativeCount += dist[distIdx].count;
+                distIdx++;
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span class="grade-pill ${cfg.class}">${cfg.grade}등급</span></td>
+                <td>${cfg.individualRatio}%</td>
+                <td>상위 ${(cfg.ratio * 100)}%</td>
+                <td>${targetCount}명</td>
+                <td><span class="cutoff-val">${cutoffScore.toFixed(1)}점</span> 이상</td>
+            `;
+            gradeBody.appendChild(tr);
+        });
+
+        updateChart(dist, averageScore);
+        resultSection.style.display = 'block';
+        window.scrollTo({ top: resultSection.offsetTop - 40, behavior: 'smooth' });
+    }
+
+    function updateChart(dist, avg) {
+        const ctx = document.getElementById('distributionChart').getContext('2d');
+        
+        const labels = dist.map(d => d.label.split('이상')[0].trim()).reverse();
+        const scoreValues = dist.map(d => d.score).reverse();
+        const counts = dist.map(d => d.count).reverse();
+
+        if (distributionChart) {
+            distributionChart.destroy();
+        }
+
+        const avgLinePlugin = {
+            id: 'avgLine',
+            afterDraw: (chart) => {
+                const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+                
+                let closestIdx = 0;
+                let minDiff = Math.abs(scoreValues[0] - avg);
+                for(let i = 1; i < scoreValues.length; i++) {
+                    let diff = Math.abs(scoreValues[i] - avg);
+                    if(diff < minDiff) {
+                        minDiff = diff;
+                        closestIdx = i;
+                    }
+                }
+                
+                const xPos = x.getPixelForValue(labels[closestIdx]);
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.moveTo(xPos, top);
+                ctx.lineTo(xPos, bottom);
+                ctx.stroke();
+
+                ctx.fillStyle = '#ef4444';
+                ctx.font = 'bold 12px Pretendard';
+                ctx.textAlign = 'center';
+                ctx.fillText(`평균: ${avg.toFixed(2)}`, xPos, top - 8);
+                ctx.restore();
+            }
+        };
+
+        distributionChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '학생 수',
+                    data: counts,
+                    backgroundColor: 'rgba(37, 99, 235, 0.5)',
+                    borderColor: 'rgba(37, 99, 235, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `${context.parsed.y}명`
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 },
+                        title: {
+                            display: true,
+                            text: '(명)',
+                            align: 'end',
+                            font: { size: 12, weight: 'bold' }
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 10 } },
+                        title: {
+                            display: true,
+                            text: '(점)',
+                            align: 'end',
+                            font: { size: 12, weight: 'bold' }
+                        }
+                    }
+                }
+            },
+            plugins: [avgLinePlugin]
+        });
+    }
+</script>
+
+</body>
+</html>
