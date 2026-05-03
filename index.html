@@ -468,6 +468,7 @@
         
         let cumulativeCount = 0;
         let distIdx = 0;
+        const gradeCutoffs = [];
 
         GRADE_CONFIG.forEach(cfg => {
             const targetCount = Math.ceil(total * cfg.ratio);
@@ -492,14 +493,19 @@
                 <td><span class="cutoff-val">${cutoffScore.toFixed(1)}점</span> 이상</td>
             `;
             gradeBody.appendChild(tr);
+
+            // 차트 표시용 컷오프 데이터 수집 (5등급은 최하점이므로 경계선 표시에서 제외 가능)
+            if (cfg.grade < 5) {
+                gradeCutoffs.push({ grade: cfg.grade, score: cutoffScore });
+            }
         });
 
-        updateChart(dist, averageScore);
+        updateChart(dist, averageScore, gradeCutoffs);
         resultSection.style.display = 'block';
         window.scrollTo({ top: resultSection.offsetTop - 40, behavior: 'smooth' });
     }
 
-    function updateChart(dist, avg) {
+    function updateChart(dist, avg, gradeCutoffs) {
         const ctx = document.getElementById('distributionChart').getContext('2d');
         
         const labels = dist.map(d => d.label.split('이상')[0].trim()).reverse();
@@ -510,37 +516,49 @@
             distributionChart.destroy();
         }
 
-        const avgLinePlugin = {
-            id: 'avgLine',
+        const statsLinesPlugin = {
+            id: 'statsLines',
             afterDraw: (chart) => {
                 const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
-                
-                let closestIdx = 0;
-                let minDiff = Math.abs(scoreValues[0] - avg);
-                for(let i = 1; i < scoreValues.length; i++) {
-                    let diff = Math.abs(scoreValues[i] - avg);
-                    if(diff < minDiff) {
-                        minDiff = diff;
-                        closestIdx = i;
+
+                const drawLine = (score, color, text, isAvg = false) => {
+                    let closestIdx = 0;
+                    let minDiff = Infinity;
+                    for(let i = 0; i < scoreValues.length; i++) {
+                        let diff = Math.abs(scoreValues[i] - score);
+                        if(diff < minDiff) {
+                            minDiff = diff;
+                            closestIdx = i;
+                        }
                     }
-                }
-                
-                const xPos = x.getPixelForValue(labels[closestIdx]);
+                    
+                    const xPos = x.getPixelForValue(labels[closestIdx]);
+                    
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = isAvg ? 2 : 1.5;
+                    ctx.setLineDash(isAvg ? [6, 4] : [4, 4]);
+                    ctx.moveTo(xPos, top);
+                    ctx.lineTo(xPos, bottom);
+                    ctx.stroke();
 
-                ctx.save();
-                ctx.beginPath();
-                ctx.strokeStyle = '#ef4444';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([6, 4]);
-                ctx.moveTo(xPos, top);
-                ctx.lineTo(xPos, bottom);
-                ctx.stroke();
+                    ctx.fillStyle = color;
+                    ctx.font = isAvg ? 'bold 12px Pretendard' : '11px Pretendard';
+                    ctx.textAlign = 'center';
+                    // 라벨 위치 엇갈리게 하여 겹침 방지 (등급컷은 조금 더 낮게 표시)
+                    const yOffset = isAvg ? top - 10 : top + (text.includes('1') ? -10 : 5);
+                    ctx.fillText(text, xPos, yOffset);
+                    ctx.restore();
+                };
 
-                ctx.fillStyle = '#ef4444';
-                ctx.font = 'bold 12px Pretendard';
-                ctx.textAlign = 'center';
-                ctx.fillText(`평균: ${avg.toFixed(2)}`, xPos, top - 10); // 여백 조절
-                ctx.restore();
+                // 1. 등급 경계선 그리기 (파란색 계열)
+                gradeCutoffs.forEach(gc => {
+                    drawLine(gc.score, '#3b82f6', `${gc.grade}등급컷`);
+                });
+
+                // 2. 평균선 그리기 (빨간색)
+                drawLine(avg, '#ef4444', `평균: ${avg.toFixed(2)}`, true);
             }
         };
 
@@ -561,7 +579,7 @@
                 responsive: true,
                 layout: {
                     padding: {
-                        top: 25 // 텍스트 짤림 방지를 위한 상단 여백 추가
+                        top: 35 // 텍스트 여유 공간을 더 확보
                     }
                 },
                 plugins: {
@@ -595,7 +613,7 @@
                     }
                 }
             },
-            plugins: [avgLinePlugin]
+            plugins: [statsLinesPlugin]
         });
     }
 </script>
