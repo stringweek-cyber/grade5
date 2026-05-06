@@ -471,7 +471,9 @@
         const gradeCutoffs = [];
 
         GRADE_CONFIG.forEach(cfg => {
-            const targetCount = Math.ceil(total * cfg.ratio);
+            // ★ 핵심 수정: Math.ceil(올림) → Math.floor(버림)
+            // 내신 등급컷은 소수점 이하 버림으로 계산 (예: 30명×10% = 3.0명 → 3명)
+            const targetCount = Math.max(1, Math.floor(total * cfg.ratio));
             let cutoffScore = 0;
 
             while (distIdx < dist.length) {
